@@ -1,0 +1,29 @@
+# cwa-ingest-bridge — compose service for Dockge
+#
+# Paste this into Dockge as a new stack named "cwa-ingest-bridge". Replace the
+# two bind mount paths below with your actual host paths (Chaptarr's ebook
+# output folder and CWA's ingest watch folder).
+
+services:
+  cwa-ingest-bridge:
+    image: ghcr.io/zchesler/cwa-ingest-bridge:latest
+    container_name: cwa-ingest-bridge
+    restart: unless-stopped
+    pull_policy: always
+
+    environment:
+      WATCH_FOLDER: /watch
+      CWA_INGEST: /ingest
+      WATCH_EXTENSIONS: epub,mobi,azw3,pdf
+      PUID: "99"
+      PGID: "100"
+
+    volumes:
+      - /mnt/user/data/chaptarr/complete:/watch
+      - /mnt/user/appdata/calibre-web-automated/ingest:/ingest
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
