@@ -4,7 +4,8 @@ LABEL org.opencontainers.image.title="cwa-ingest-bridge"
 LABEL org.opencontainers.image.description="Watches a folder for new ebook files and copies them into a Calibre-Web-Automated ingest folder."
 LABEL org.opencontainers.image.licenses="MIT"
 
-RUN apk add --no-cache bash inotify-tools
+# tzdata lets TZ=Region/City take effect; without it log timestamps stay UTC.
+RUN apk add --no-cache bash inotify-tools tzdata
 
 COPY watch.sh /usr/local/bin/watch.sh
 RUN chmod +x /usr/local/bin/watch.sh

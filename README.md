@@ -29,6 +29,7 @@ Every detected file and every copy is logged to stdout with a timestamp.
 | `WATCH_EXTENSIONS`   | `epub,mobi,azw3,pdf`   | Comma-separated, case-insensitive extension list.  |
 | `PUID`               | `99`                   | UID to chown copied files to.                      |
 | `PGID`               | `100`                  | GID to chown copied files to.                      |
+| `TZ`                 | `UTC`                  | Timezone for log timestamps, e.g. `Asia/Jerusalem`. |
 
 `WATCH_FOLDER` and `CWA_INGEST` inside the container are fixed by the image
 defaults above; map your real host paths onto `/watch` and `/ingest` with

@@ -17,6 +17,7 @@ services:
       WATCH_EXTENSIONS: epub,mobi,azw3,pdf
       PUID: "99"
       PGID: "100"
+      TZ: Asia/Jerusalem
 
     volumes:
       - /mnt/user/data/chaptarr/complete:/watch
