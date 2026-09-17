@@ -1,22 +1,25 @@
 FROM alpine:3.20
 
 LABEL org.opencontainers.image.title="cwa-ingest-bridge"
-LABEL org.opencontainers.image.description="Watches a folder for new ebook files and copies them into a Calibre-Web-Automated ingest folder."
+LABEL org.opencontainers.image.description="Copies every ebook Chaptarr imports into a Calibre-Web-Automated ingest folder."
 LABEL org.opencontainers.image.licenses="MIT"
 
 # tzdata lets TZ=Region/City take effect; without it log timestamps stay UTC.
-RUN apk add --no-cache bash inotify-tools tzdata
+RUN apk add --no-cache bash curl jq tzdata
 
-COPY watch.sh /usr/local/bin/watch.sh
-RUN chmod +x /usr/local/bin/watch.sh
+COPY bridge.sh /usr/local/bin/bridge.sh
+RUN chmod +x /usr/local/bin/bridge.sh
 
-# Runs as root so it can chown copied files to PUID:PGID at runtime.
-ENV WATCH_FOLDER=/watch \
+ENV LIBRARY=/library \
     CWA_INGEST=/ingest \
-    WATCH_EXTENSIONS=epub,mobi,azw3,pdf \
-    PUID=99 \
-    PGID=100
+    STATE_DIR=/state
 
-VOLUME ["/watch", "/ingest"]
+# Runs as the owner of CWA's ingest folder (nobody:users on Unraid), so copies
+# land with the right owner. Override with `user:` in compose if yours differs.
+USER 99:100
 
-ENTRYPOINT ["/usr/local/bin/watch.sh"]
+# The heartbeat is touched after every successful read of Chaptarr's history.
+HEALTHCHECK --interval=60s --timeout=10s --start-period=2m \
+  CMD find /state/heartbeat -mmin -10 2>/dev/null | grep -q . || exit 1
+
+ENTRYPOINT ["/usr/local/bin/bridge.sh"]

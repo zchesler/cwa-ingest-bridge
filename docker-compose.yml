@@ -1,27 +1,33 @@
 # cwa-ingest-bridge — compose service for Dockge
 #
-# Paste this into Dockge as a new stack named "cwa-ingest-bridge". Replace the
-# two bind mount paths below with your actual host paths (Chaptarr's ebook
-# output folder and CWA's ingest watch folder).
+# Run it on the machine where Calibre-Web-Automated runs, so it writes into
+# the ingest folder directly. Put the secrets in the stack's .env.
 
 services:
   cwa-ingest-bridge:
     image: ghcr.io/zchesler/cwa-ingest-bridge:latest
     container_name: cwa-ingest-bridge
     restart: unless-stopped
-    pull_policy: always
+    # Owner of CWA's ingest folder (nobody:users on Unraid).
+    user: "99:100"
 
     environment:
-      WATCH_FOLDER: /watch
-      CWA_INGEST: /ingest
-      WATCH_EXTENSIONS: epub,mobi,azw3,pdf
-      PUID: "99"
-      PGID: "100"
+      CHAPTARR_URL: http://192.168.1.10:8789
+      CHAPTARR_API_KEY: ${CHAPTARR_API_KEY}
+      # Chaptarr's ebook root folder, as Chaptarr sees it.
+      CHAPTARR_EBOOK_ROOT: /ebooks
+      # Optional: hear about books that couldn't be copied.
+      NTFY_URL: ${NTFY_URL:-}
+      NTFY_TOKEN: ${NTFY_TOKEN:-}
       TZ: Asia/Jerusalem
 
     volumes:
-      - /mnt/user/data/chaptarr/complete:/watch
+      # The same ebook folder, as this machine sees it (read-only is enough).
+      - /mnt/remotes/NAS_media/books:/library:ro,slave
+      # CWA's ingest folder.
       - /mnt/user/appdata/calibre-web-automated/ingest:/ingest
+      # Remembers which imports were already copied.
+      - /mnt/user/appdata/cwa-ingest-bridge:/state
 
     logging:
       driver: json-file

@@ -16,7 +16,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: shell syntax check
-        run: bash -n watch.sh
+        run: bash -n bridge.sh test/run.sh
+      - name: end-to-end test
+        run: bash test/run.sh
 
   publish:
     needs: test
