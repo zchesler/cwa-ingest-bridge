@@ -24,6 +24,8 @@ POLL_SECONDS="${POLL_SECONDS:-60}"
 # A book that can't be copied is retried on every poll, this many times.
 MAX_ATTEMPTS="${MAX_ATTEMPTS:-30}"
 PAGE_SIZE="${PAGE_SIZE:-100}"
+# Minutes the library may look empty (share not mounted) before ntfy is told.
+LIBRARY_ALERT_MINUTES="${LIBRARY_ALERT_MINUTES:-30}"
 # Optional: ntfy topic URL (and token) to hear about books that couldn't be copied.
 NTFY_URL="${NTFY_URL:-}"
 NTFY_TOKEN="${NTFY_TOKEN:-}"
@@ -31,6 +33,7 @@ NTFY_TOKEN="${NTFY_TOKEN:-}"
 LAST_ID_FILE="$STATE_DIR/last-history-id"
 PENDING_FILE="$STATE_DIR/pending" # history id <TAB> attempts <TAB> path in Chaptarr
 HEARTBEAT_FILE="$STATE_DIR/heartbeat"
+MISSING_SINCE_FILE="$STATE_DIR/library-missing-since"
 
 log() {
   printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"
@@ -133,6 +136,34 @@ copy_pending() {
   mv -f "$kept" "$PENDING_FILE"
 }
 
+# The library is a network share. On Unraid, Unassigned Devices mounts it a
+# minute or so after Docker has started the containers, and a container that
+# started first keeps seeing the empty mount point until it's restarted — after
+# a reboot on 2026-10-06 every book was "not found" for 30 polls. So an empty
+# library means "restart me": wait a poll, exit, and let Docker's restart
+# policy start the container again once the share is there. Pending books
+# aren't tried meanwhile, so they don't use up their attempts.
+check_library() {
+  if [ -n "$(ls -A "$LIBRARY" 2>/dev/null | head -n 1)" ]; then
+    if [ -e "$MISSING_SINCE_FILE" ]; then
+      log "the library is visible again"
+      rm -f "$MISSING_SINCE_FILE" "$MISSING_SINCE_FILE.notified"
+    fi
+    return 0
+  fi
+  local now since
+  now="$(date +%s)"
+  [ -s "$MISSING_SINCE_FILE" ] || printf '%s\n' "$now" >"$MISSING_SINCE_FILE"
+  since="$(cat "$MISSING_SINCE_FILE")"
+  log "WARN: $LIBRARY is empty — the share probably wasn't mounted yet when this container started; restarting in ${POLL_SECONDS}s"
+  if [ $((now - since)) -ge $((LIBRARY_ALERT_MINUTES * 60)) ] && [ ! -e "$MISSING_SINCE_FILE.notified" ]; then
+    notify "Calibre bridge can't see the library" "$LIBRARY has looked empty for $(((now - since) / 60)) minutes, so new ebooks aren't reaching Calibre. Is the NAS share mounted on this host?"
+    touch "$MISSING_SINCE_FILE.notified"
+  fi
+  sleep "$POLL_SECONDS"
+  exit 1
+}
+
 mkdir -p "$STATE_DIR"
 touch "$PENDING_FILE"
 
@@ -156,6 +187,7 @@ fi
 
 failures=0
 while :; do
+  check_library
   if collect_imports; then
     [ "$failures" -ge "$MAX_ATTEMPTS" ] && log "Chaptarr's history is readable again"
     failures=0

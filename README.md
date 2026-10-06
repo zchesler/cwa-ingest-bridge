@@ -28,6 +28,13 @@ half-copied book.
   restarts: CWA's init runs `install -d` on the ingest folder, which resets it
   to `755`, so only its owner can create files there.
 
+- **Survives a share mounted late.** On Unraid, Unassigned Devices mounts
+  network shares a minute or so after Docker starts the containers, and a
+  container that started first keeps seeing the empty mount point. When the
+  library looks empty the bridge waits a poll and exits, so Docker's restart
+  policy brings it back once the share is there; pending books keep their
+  attempts. If it stays empty for `LIBRARY_ALERT_MINUTES`, ntfy is told once.
+
 On its very first start it begins after the newest history event, so old
 imports aren't copied. Set `START_AFTER_ID` to a history id to include
 imports after it.
@@ -49,6 +56,7 @@ container is healthy while it can read Chaptarr's history.
 | `MAX_ATTEMPTS`        | `30`                                | Polls to keep retrying a book before giving up and notifying.       |
 | `NTFY_URL`            | —                                   | Optional ntfy topic URL for failures, e.g. `https://ntfy.sh/books`. |
 | `NTFY_TOKEN`          | —                                   | Optional ntfy access token.                                         |
+| `LIBRARY_ALERT_MINUTES` | `30`                              | Minutes the library may look empty before ntfy is told.             |
 | `START_AFTER_ID`      | —                                   | First start only: copy imports after this history id.               |
 | `TZ`                  | `UTC`                               | Timezone for log timestamps, e.g. `Asia/Jerusalem`.                 |
 

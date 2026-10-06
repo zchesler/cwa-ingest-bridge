@@ -40,7 +40,7 @@ done
 run() {
   env CHAPTARR_URL="http://127.0.0.1:$port" CHAPTARR_API_KEY=test \
     LIBRARY="$work/library" CWA_INGEST="$work/ingest" STATE_DIR="$work/state" \
-    MAX_ATTEMPTS=2 ONCE=1 "$@" bash bridge.sh
+    MAX_ATTEMPTS=2 POLL_SECONDS=0 ONCE=1 "$@" bash bridge.sh
 }
 
 # Imports after id 10: the ebook is copied, the audiobook and other events
@@ -75,5 +75,19 @@ rm -rf "$work/state" "$work/ingest" && mkdir -p "$work/state" "$work/ingest"
 run
 [ "$(cat "$work/state/last-history-id")" = 14 ] || fail "first run should start after the newest event"
 [ -z "$(ls "$work/ingest")" ] || fail "first run shouldn't copy old imports"
+
+# An empty library (the share wasn't mounted when the container started) makes
+# it exit for a restart, without using up the attempts of pending books.
+mv "$work/library" "$work/library-mounted" && mkdir -p "$work/library"
+printf '14\t1\t/ebooks/Later/Later.epub\n' >"$work/state/pending"
+if run; then fail "should exit when the library is empty"; fi
+grep -q $'^14\t1\t' "$work/state/pending" || fail "an empty library used up an attempt"
+[ -s "$work/state/library-missing-since" ] || fail "didn't note when the library went missing"
+
+# Once the share is there, it carries on and copies the book.
+rm -rf "$work/library" && mv "$work/library-mounted" "$work/library"
+run
+[ -f "$work/ingest/Later.epub" ] || fail "didn't copy once the library was back"
+[ ! -e "$work/state/library-missing-since" ] || fail "missing-since should be cleared"
 
 echo "all bridge tests passed"
